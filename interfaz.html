@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ordenamiento Paralelo — Lab 2</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg2:#161c28;--bg3:#1e2636;--bg4:#242f44;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.13);
+  --text:#e6eaf2;--text2:#8993a8;--text3:#434d63;
+  --h0:#7f77dd;--h0l:#d4d0f8;--h0bg:rgba(127,119,221,0.18);
+  --h1:#22b87a;--h1l:#9fe8c8;--h1bg:rgba(34,184,122,0.18);
+  --h2:#e0603a;--h2l:#f5c0ad;--h2bg:rgba(224,96,58,0.18);
+  --h3:#f0a82a;--h3l:#fad48a;--h3bg:rgba(240,168,42,0.18);
+  --teal:#22b87a;--amber:#f0a82a;--purple:#7f77dd;
+}
+body{background:var(--bg);color:var(--text);font-family:'Inter',sans-serif;font-size:13px;min-height:100vh;padding-bottom:2rem}
+
+header{background:var(--bg2);border-bottom:1px solid var(--border);padding:.8rem 1.4rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;position:sticky;top:0;z-index:30}
+.htitle{font-size:14px;font-weight:600}.hsub{font-size:11px;color:var(--text2);margin-top:1px}
+.pill{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600;margin-left:6px;border:1px solid var(--border2);background:var(--bg3);color:var(--text2);vertical-align:middle;transition:all .3s}
+.pill.run{background:var(--h0bg);color:var(--h0l);border-color:var(--h0)}
+.pill.fin{background:var(--h3bg);color:var(--h3l);border-color:var(--h3)}
+.pill.done{background:var(--h1bg);color:var(--h1l);border-color:var(--h1)}
+.pdot{width:5px;height:5px;border-radius:50%;background:currentColor}
+.pill.run .pdot{animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.hbtns{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+button{display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:7px;font-size:12px;font-weight:500;border:1px solid var(--border2);background:var(--bg3);color:var(--text);cursor:pointer;font-family:inherit;transition:all .15s}
+button:hover:not(:disabled){background:var(--bg4)}
+button:active:not(:disabled){transform:scale(.97)}
+button:disabled{opacity:.35;cursor:not-allowed}
+button.primary{background:var(--purple);border-color:var(--purple);color:#fff}
+button.primary:hover:not(:disabled){background:#6b63c8}
+.spd{display:flex;align-items:center;gap:7px}
+.spd label{font-size:11px;color:var(--text2)}
+input[type=range]{width:70px;accent-color:var(--purple);cursor:pointer}
+.spd-v{font-size:12px;font-weight:600;min-width:20px;color:var(--text)}
+
+main{max-width:1280px;margin:0 auto;padding:1rem 1.4rem}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:1.2rem}
+.mc{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:10px 13px}
+.mc .l{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:2px}
+.mc .v{font-size:22px;font-weight:700;font-family:'JetBrains Mono',monospace}
+
+.slbl{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+.slbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* HILOS — timeline visual */
+.hilos-section{margin-bottom:1.2rem}
+.hilos-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.hc{background:var(--bg2);border:2px solid var(--border);border-radius:10px;padding:11px;transition:border-color .25s,box-shadow .25s}
+.hc.act0{border-color:var(--h0);box-shadow:0 0 0 2px var(--h0bg)}
+.hc.act1{border-color:var(--h1);box-shadow:0 0 0 2px var(--h1bg)}
+.hc.act2{border-color:var(--h2);box-shadow:0 0 0 2px var(--h2bg)}
+.hc.act3{border-color:var(--h3);box-shadow:0 0 0 2px var(--h3bg)}
+.hc.done{border-color:var(--text3)}
+.hc-top{display:flex;align-items:center;gap:7px;margin-bottom:7px}
+.hc-av{width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;font-family:'JetBrains Mono',monospace;flex-shrink:0}
+.hc-name{font-size:13px;font-weight:600}
+.hc-st{font-size:10px;color:var(--text3);margin-bottom:6px;min-height:13px;font-family:'JetBrains Mono',monospace}
+/* timeline de rangos procesados por este hilo */
+.hc-timeline{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px;min-height:20px}
+.tl-chip{padding:1px 5px;border-radius:4px;font-size:9px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.hc-cnt{font-size:20px;font-weight:700;font-family:'JetBrains Mono',monospace}
+.hc-lbl{font-size:9px;color:var(--text3)}
+.hc-swaps{font-size:16px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-top:4px}
+.hc-slbl{font-size:9px;color:var(--text3)}
+
+/* SEMÁFOROS — fila visual */
+.sem-section{margin-bottom:1.2rem}
+.sem-row{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+.sem-card{background:var(--bg2);border:2px solid var(--border);border-radius:8px;padding:6px 4px;text-align:center;transition:all .25s}
+.sem-card.libre{border-color:var(--border)}
+.sem-card.tomado0{border-color:var(--h0);background:var(--h0bg)}
+.sem-card.tomado1{border-color:var(--h1);background:var(--h1bg)}
+.sem-card.tomado2{border-color:var(--h2);background:var(--h2bg)}
+.sem-card.tomado3{border-color:var(--h3);background:var(--h3bg)}
+.sem-card.ordenado{border-color:var(--teal);background:rgba(34,184,122,.1)}
+.sem-card.final{border-color:var(--amber);background:rgba(240,168,42,.1)}
+.sem-num{font-size:11px;font-weight:700;color:var(--text2);font-family:'JetBrains Mono',monospace}
+.sem-idx{font-size:8px;color:var(--text3);margin-top:1px}
+.sem-badge{font-size:9px;font-weight:700;margin-top:4px;height:14px;display:flex;align-items:center;justify-content:center;border-radius:4px}
+
+/* RANGOS — grid grande 2x5 con números */
+.rangos-section{margin-bottom:1.2rem}
+.rangos-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.rango-card{background:var(--bg2);border:2px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .25s,box-shadow .25s}
+.rango-card.idle  {border-color:var(--border)}
+.rango-card.act0  {border-color:var(--h0);box-shadow:0 0 0 3px var(--h0bg)}
+.rango-card.act1  {border-color:var(--h1);box-shadow:0 0 0 3px var(--h1bg)}
+.rango-card.act2  {border-color:var(--h2);box-shadow:0 0 0 3px var(--h2bg)}
+.rango-card.act3  {border-color:var(--h3);box-shadow:0 0 0 3px var(--h3bg)}
+.rango-card.listo {border-color:var(--teal)}
+.rango-card.finalb{border-color:var(--amber)}
+.rc-head{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--bg3);border-bottom:1px solid var(--border)}
+.rc-title{font-size:10px;font-weight:600;color:var(--text2)}
+.rc-badge{font-size:9px;font-weight:700;padding:1px 5px;border-radius:5px;background:var(--bg4);color:var(--text3);font-family:'JetBrains Mono',monospace;transition:all .2s}
+.rc-nums{padding:4px 3px;display:grid;grid-template-columns:repeat(10,1fr);gap:1.5px;background:var(--bg2)}
+.num-cell{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:500;border-radius:2px;padding:1.5px 0;background:var(--bg3);color:var(--text3);transition:background .1s,color .1s,transform .08s;min-height:15px;text-align:center}
+.num-cell.h0{background:var(--h0bg);color:var(--h0l)}
+.num-cell.h1{background:var(--h1bg);color:var(--h1l)}
+.num-cell.h2{background:var(--h2bg);color:var(--h2l)}
+.num-cell.h3{background:var(--h3bg);color:var(--h3l)}
+.num-cell.swap{background:currentColor;color:#fff;transform:scale(1.2);font-weight:700;z-index:2;position:relative}
+.num-cell.swapA{background:var(--text);color:var(--bg);transform:scale(1.18);font-weight:700;z-index:2;position:relative}
+.num-cell.swapB{background:var(--text2);color:var(--bg);transform:scale(1.18);font-weight:700;z-index:2;position:relative}
+.num-cell.done{background:rgba(34,184,122,.14);color:var(--h1l)}
+.num-cell.fin{background:rgba(240,168,42,.12);color:var(--h3l)}
+.rc-prog{height:3px;background:var(--bg3)}
+.rc-pf{height:100%;width:0%;transition:width .06s linear;border-radius:2px}
+.rc-foot{display:flex;align-items:center;justify-content:space-between;padding:2px 6px;background:var(--bg3);border-top:1px solid var(--border);font-size:8px;color:var(--text3);font-family:'JetBrains Mono',monospace}
+
+/* LOG */
+.log-section{margin-bottom:1rem}
+.log-box{background:var(--bg2);border:1px solid var(--border);border-radius:9px;padding:8px 11px;height:120px;overflow-y:auto;font-family:'JetBrains Mono',monospace;font-size:10px;scrollbar-width:thin;scrollbar-color:var(--border2) transparent}
+.log-box::-webkit-scrollbar{width:3px}
+.log-box::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.ll{padding:2px 0;color:var(--text2);border-bottom:1px solid var(--border);display:flex;align-items:baseline;gap:4px}
+.ll:last-child{border:none}
+.llt{font-size:9px;color:var(--text3);flex-shrink:0;min-width:36px}
+.tag{display:inline-block;padding:0 5px;border-radius:3px;font-size:9px;font-weight:700;flex-shrink:0}
+.th0{background:var(--h0bg);color:var(--h0l)}.th1{background:var(--h1bg);color:var(--h1l)}
+.th2{background:var(--h2bg);color:var(--h2l)}.th3{background:var(--h3bg);color:var(--h3l)}
+.tok{background:rgba(34,184,122,.15);color:var(--h1l)}
+.tsys{background:rgba(139,147,168,.1);color:var(--text2)}
+.tfin{background:var(--h3bg);color:var(--h3l)}
+.tnext{background:rgba(127,119,221,.15);color:var(--h0l)}
+
+/* FINAL */
+.final-section{margin-top:.3rem}
+.final-wrap{background:var(--bg2);border:2px solid var(--border);border-radius:10px;overflow:hidden;transition:border-color .4s}
+.final-wrap.visible{border-color:var(--teal);box-shadow:0 0 0 3px var(--h1bg)}
+.final-head{padding:7px 12px;background:var(--bg3);border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.final-title{font-size:12px;font-weight:600;color:var(--text2)}
+.final-badge{font-size:10px;font-weight:700;padding:1px 8px;border-radius:8px;background:var(--bg4);color:var(--text3);font-family:'JetBrains Mono',monospace}
+.final-badge.ok{background:var(--h1bg);color:var(--h1l)}
+#cv-final{display:block;width:100%;height:60px;background:var(--bg3)}
+.final-nums-grid{padding:6px;display:grid;grid-template-columns:repeat(20,1fr);gap:1.5px}
+.fn-cell{display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:7.5px;font-weight:500;border-radius:2px;padding:2px 0;min-height:14px;background:rgba(34,184,122,.12);color:var(--h1l);text-align:center}
+
+@media(max-width:900px){
+  .rangos-grid{grid-template-columns:repeat(2,1fr)}
+  .metrics{grid-template-columns:repeat(3,1fr)}
+  .hilos-grid{grid-template-columns:repeat(2,1fr)}
+}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <div class="htitle">Ordenamiento Paralelo
+      <span class="pill" id="fase-pill"><span class="pdot"></span><span id="fase-txt">en espera</span></span>
+    </div>
+    <div class="hsub">Lab 2 · 4 hilos compiten por 10 rangos · el hilo que termina toma el siguiente rango libre</div>
+  </div>
+  <div class="hbtns">
+    <div class="spd">
+      <label>velocidad</label>
+      <input type="range" id="spd" min="1" max="8" value="3" step="1" oninput="document.getElementById('spd-v').textContent=this.value+'x'">
+      <span class="spd-v" id="spd-v">3x</span>
+    </div>
+    <button class="primary" id="btn-run" onclick="iniciar()">▶ Ejecutar</button>
+    <button onclick="resetear()">↺ Reiniciar</button>
+  </div>
+</header>
+
+<main>
+  <div class="metrics">
+    <div class="mc"><div class="l">total</div><div class="v">1 000</div></div>
+    <div class="mc"><div class="l">rangos listos</div><div class="v" id="m-r" style="color:var(--teal)">0/10</div></div>
+    <div class="mc"><div class="l">hilos activos</div><div class="v" id="m-h" style="color:var(--purple)">0</div></div>
+    <div class="mc"><div class="l">rangos libres</div><div class="v" id="m-lib" style="color:var(--text2)">10</div></div>
+    <div class="mc"><div class="l">tiempo (ms)</div><div class="v" id="m-t" style="color:var(--amber)">—</div></div>
+  </div>
+
+  <!-- HILOS -->
+  <div class="hilos-section">
+    <div class="slbl">hilos — cada uno toma rangos libres secuencialmente hasta que no queden</div>
+    <div class="hilos-grid" id="hs"></div>
+  </div>
+
+  <!-- SEMÁFOROS -->
+  <div class="sem-section">
+    <div class="slbl">semáforos S[10] — estado de cada rango (libre / tomado por hilo X / ordenado)</div>
+    <div class="sem-row" id="sem-row"></div>
+  </div>
+
+  <!-- RANGOS CON NÚMEROS -->
+  <div class="rangos-section">
+    <div class="slbl">rangos — números reales moviéndose durante el ordenamiento</div>
+    <div class="rangos-grid" id="rg"></div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log-section">
+    <div class="slbl">registro de eventos</div>
+    <div class="log-box" id="log"></div>
+  </div>
+
+  <!-- RESULTADO FINAL -->
+  <div class="final-section">
+    <div class="slbl">resultado final</div>
+    <div class="final-wrap" id="final-wrap">
+      <div class="final-head">
+        <span class="final-title">m[0..999] ordenado completamente</span>
+        <span class="final-badge" id="final-badge">pendiente</span>
+      </div>
+      <canvas id="cv-final" role="img" aria-label="Arreglo final ordenado"></canvas>
+      <div class="final-nums-grid" id="final-nums-grid">
+        <div style="grid-column:1/-1;padding:16px;text-align:center;color:var(--text3);font-family:'JetBrains Mono',monospace;font-size:11px">
+          Ejecuta el algoritmo para ver el resultado ordenado...
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+const MAX=1000, NH=4, RS=100, NR=10;
+const HC=['#7f77dd','#22b87a','#e0603a','#f0a82a'];
+const HL=['#d4d0f8','#9fe8c8','#f5c0ad','#fad48a'];
+const HBG=['rgba(127,119,221,.18)','rgba(34,184,122,.18)','rgba(224,96,58,.18)','rgba(240,168,42,.18)'];
+const HCLS=['act0','act1','act2','act3'];
+const NUMCLS=['h0','h1','h2','h3'];
+
+let arr=[], estR=[], semR=[], hiloR=[-1,-1,-1,-1], hiloC=[0,0,0,0], hiloSwaps=[0,0,0,0];
+let corriendo=false, t0=0;
+const delay=ms=>new Promise(r=>setTimeout(r,ms));
+function spd(){ return Math.max(3,150-parseInt(document.getElementById('spd').value||3)*17); }
+function ts(){ return t0?((Date.now()-t0)/1000).toFixed(2)+'s':'0.00s'; }
+
+function llenar(){
+  const a=Array.from({length:MAX},(_,i)=>i);
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+/* ── INIT UI ── */
+function initUI(){
+  /* hilos */
+  const hs=document.getElementById('hs'); hs.innerHTML='';
+  for(let i=0;i<NH;i++){
+    hs.innerHTML+=`<div class="hc" id="hc${i}">
+      <div class="hc-top">
+        <div class="hc-av" style="background:${HBG[i]};color:${HL[i]}">H${i}</div>
+        <div class="hc-name" style="color:${HL[i]}">Hilo ${i}</div>
+      </div>
+      <div class="hc-st" id="hr${i}">esperando...</div>
+      <div class="hc-timeline" id="htl${i}"></div>
+      <div class="hc-cnt" style="color:${HC[i]}" id="hcnt${i}">0</div>
+      <div class="hc-lbl">rangos procesados</div>
+      <div class="hc-swaps" style="color:${HC[i]}" id="hsw${i}">0</div>
+      <div class="hc-slbl">swaps totales</div>
+    </div>`;
+  }
+  /* semáforos */
+  const sr=document.getElementById('sem-row'); sr.innerHTML='';
+  for(let r=0;r<NR;r++){
+    sr.innerHTML+=`<div class="sem-card libre" id="sc${r}">
+      <div class="sem-num">S[${r}]</div>
+      <div class="sem-idx">${r*RS}–${r*RS+RS-1}</div>
+      <div class="sem-badge" id="sb${r}" style="color:var(--text3)">libre</div>
+    </div>`;
+  }
+  /* rangos */
+  const rg=document.getElementById('rg'); rg.innerHTML='';
+  for(let r=0;r<NR;r++){
+    let cells='';
+    for(let k=0;k<RS;k++) cells+=`<div class="num-cell" id="nc${r}_${k}">—</div>`;
+    rg.innerHTML+=`<div class="rango-card idle" id="rc${r}">
+      <div class="rc-head">
+        <span class="rc-title">Rango ${r} · ${r*RS}–${r*RS+RS-1}</span>
+        <span class="rc-badge" id="rb${r}">libre</span>
+      </div>
+      <div class="rc-nums" id="rn${r}">${cells}</div>
+      <div class="rc-prog"><div class="rc-pf" id="rp${r}"></div></div>
+      <div class="rc-foot">
+        <span id="rf${r}">swaps: 0</span>
+        <span id="rpp${r}">0%</span>
+      </div>
+    </div>`;
+  }
+  /* mostrar números iniciales */
+  for(let r=0;r<NR;r++){
+    for(let k=0;k<RS;k++){
+      const el=document.getElementById(`nc${r}_${k}`);
+      if(el){ el.className='num-cell'; el.textContent=arr[r*RS+k]; }
+    }
+  }
+  /* reset final */
+  document.getElementById('final-wrap').classList.remove('visible');
+  document.getElementById('final-badge').textContent='pendiente';
+  document.getElementById('final-badge').className='final-badge';
+  document.getElementById('final-nums-grid').innerHTML=
+    '<div style="grid-column:1/-1;padding:16px;text-align:center;color:var(--text3);font-family:JetBrains Mono,monospace;font-size:11px">Ejecuta el algoritmo para ver el resultado ordenado...</div>';
+  const cv=document.getElementById('cv-final');
+  const ctx=cv.getContext('2d');
+  ctx.fillStyle='#1e2636'; ctx.fillRect(0,0,cv.width||800,60);
+}
+
+/* ── SEMÁFORO UI ── */
+function setSem(r, st, hilo){
+  const sc=document.getElementById('sc'+r);
+  const sb=document.getElementById('sb'+r);
+  if(!sc) return;
+  if(st==='libre'){
+    sc.className='sem-card libre';
+    sb.style.background=''; sb.style.color='var(--text3)'; sb.textContent='libre';
+  } else if(st==='tomado'){
+    sc.className=`sem-card tomado${hilo}`;
+    sb.style.background=HC[hilo]; sb.style.color='#fff'; sb.textContent='H'+hilo;
+  } else if(st==='ord'){
+    sc.className='sem-card ordenado';
+    sb.style.background='var(--teal)'; sb.style.color='#fff'; sb.textContent='✓';
+  } else if(st==='fin'){
+    sc.className='sem-card final';
+    sb.style.background='var(--amber)'; sb.style.color='#fff'; sb.textContent='↑';
+  }
+}
+
+/* ── RANGO CARD UI ── */
+function setRango(r, st, hilo){
+  estR[r]=st;
+  const rc=document.getElementById('rc'+r);
+  const rb=document.getElementById('rb'+r);
+  const rp=document.getElementById('rp'+r);
+  if(!rc) return;
+  rc.className='rango-card '+(st==='idle'?'idle':st==='listo'?'listo':st==='finalb'?'finalb':`act${hilo}`);
+  if(st==='idle'){ rb.textContent='libre'; rb.style.background=''; rb.style.color=''; }
+  else if(st==='listo'){ rb.textContent='✓ listo'; rb.style.background='var(--teal)'; rb.style.color='#fff'; }
+  else if(st==='finalb'){ rb.textContent='↑ final'; rb.style.background='var(--amber)'; rb.style.color='#fff'; }
+  else { rb.textContent='H'+hilo; rb.style.background=HC[hilo]; rb.style.color='#fff'; }
+  const pf=document.getElementById('rp'+r);
+  if(pf&&(st==='listo'||st==='finalb')) pf.style.width='100%';
+  if(pf) pf.style.background=st==='listo'?'var(--teal)':st==='finalb'?'var(--amber)':HC[hilo]||'var(--purple)';
+}
+
+/* ── PILL ── */
+function setPill(s){
+  const p=document.getElementById('fase-pill'), t=document.getElementById('fase-txt');
+  p.className='pill '+s;
+  t.textContent={idle:'en espera',run:'ejecutando',fin:'burbuja final',done:'completado'}[s];
+}
+
+/* ── LOG ── */
+function addLog(html){
+  const b=document.getElementById('log');
+  const d=document.createElement('div'); d.className='ll';
+  d.innerHTML=`<span class="llt">${ts()}</span>${html}`;
+  b.prepend(d);
+}
+
+/* ── CHIP EN TIMELINE DEL HILO ── */
+function addChip(hilo, rango){
+  const tl=document.getElementById('htl'+hilo);
+  if(!tl) return;
+  const chip=document.createElement('span');
+  chip.className='tl-chip';
+  chip.style.background=HBG[hilo]; chip.style.color=HL[hilo];
+  chip.textContent='R'+rango;
+  tl.appendChild(chip);
+}
+
+/* ── MÉTRICAS ── */
+function updM(){
+  const l=estR.filter(s=>s==='listo'||s==='finalb').length;
+  const lib=semR.filter(v=>!v).length;
+  const act=hiloR.filter(v=>v>=0).length;
+  document.getElementById('m-r').textContent=l+'/10';
+  document.getElementById('m-h').textContent=act;
+  document.getElementById('m-lib').textContent=lib;
+  if(t0) document.getElementById('m-t').textContent=Math.round(Date.now()-t0);
+}
+
+/* ── ANIMACIÓN BURBUJA RANGO — muestra los números moviéndose ── */
+async function animarRango(r, hilo){
+  const ini=r*RS, fin=ini+RS;
+  const cls=NUMCLS[hilo];
+
+  /* colorear números con el color del hilo */
+  for(let k=0;k<RS;k++){
+    const el=document.getElementById(`nc${r}_${k}`);
+    if(el){ el.className='num-cell '+cls; el.textContent=arr[ini+k]; }
+  }
+
+  /* pre-calcular todos los pasos de burbuja */
+  const tmp=[...arr];
+  const steps=[];
+  for(let i=ini;i<fin;i++)
+    for(let j=ini;j<fin-(i-ini)-1;j++)
+      if(tmp[j]>tmp[j+1]){ [tmp[j],tmp[j+1]]=[tmp[j+1],tmp[j]]; steps.push([j,j+1]); }
+
+  const total=Math.max(1,steps.length);
+  /* mostrar hasta 80 frames para equilibrar velocidad y percepción */
+  const frames=80;
+  const skip=Math.max(1,Math.floor(total/frames));
+  let localSwaps=0;
+
+  for(let s=0;s<steps.length;s++){
+    const [a,b]=steps[s];
+    [arr[a],arr[b]]=[arr[b],arr[a]];
+    localSwaps++; hiloSwaps[hilo]++;
+
+    if(s%skip===0){
+      const ka=a-ini, kb=b-ini;
+      const ea=document.getElementById(`nc${r}_${ka}`);
+      const eb=document.getElementById(`nc${r}_${kb}`);
+      /* highlight del par intercambiado */
+      if(ea){ ea.className='num-cell swapA'; ea.textContent=arr[a]; }
+      if(eb){ eb.className='num-cell swapB'; eb.textContent=arr[b]; }
+      /* actualizar progreso */
+      const pct=Math.round((s/total)*100);
+      const rp=document.getElementById('rp'+r); if(rp) rp.style.width=pct+'%';
+      document.getElementById('rpp'+r).textContent=pct+'%';
+      document.getElementById('rf'+r).textContent='sw:'+localSwaps;
+      document.getElementById('hsw'+hilo).textContent=hiloSwaps[hilo];
+      await delay(spd());
+      /* restaurar color hilo */
+      if(ea){ ea.className='num-cell '+cls; ea.textContent=arr[a]; }
+      if(eb){ eb.className='num-cell '+cls; eb.textContent=arr[b]; }
+    }
+  }
+  /* aplicar estado final correcto */
+  for(let i=ini;i<fin;i++) arr[i]=tmp[i];
+  for(let k=0;k<RS;k++){
+    const el=document.getElementById(`nc${r}_${k}`);
+    if(el){ el.className='num-cell done'; el.textContent=arr[ini+k]; }
+  }
+  document.getElementById('rp'+r).style.width='100%';
+  document.getElementById('rpp'+r).textContent='100%';
+  document.getElementById('rf'+r).textContent='sw:'+localSwaps;
+}
+
+/* ── BURBUJA FINAL ANIMADA ── */
+async function animarFinal(){
+  for(let r=0;r<NR;r++)
+    for(let k=0;k<RS;k++){
+      const el=document.getElementById(`nc${r}_${k}`);
+      if(el){ el.className='num-cell fin'; el.textContent=arr[r*RS+k]; }
+    }
+  const tmp=[...arr];
+  const steps=[];
+  for(let i=0;i<MAX;i++)
+    for(let j=0;j<MAX-i-1;j++)
+      if(tmp[j]>tmp[j+1]){ [tmp[j],tmp[j+1]]=[tmp[j+1],tmp[j]]; steps.push([j,j+1]); }
+  const skip=Math.max(1,Math.floor(steps.length/200));
+  for(let s=0;s<steps.length;s++){
+    const [a,b]=steps[s];
+    [arr[a],arr[b]]=[arr[b],arr[a]];
+    if(s%skip===0){
+      const ra=Math.floor(a/RS), ka=a%RS;
+      const rb2=Math.floor(b/RS), kb=b%RS;
+      const ea=document.getElementById(`nc${ra}_${ka}`);
+      const eb=document.getElementById(`nc${rb2}_${kb}`);
+      if(ea){ ea.className='num-cell swapA'; ea.textContent=arr[a]; }
+      if(eb){ eb.className='num-cell swapB'; eb.textContent=arr[b]; }
+      await delay(4);
+      if(ea){ ea.className='num-cell fin'; ea.textContent=arr[a]; }
+      if(eb){ eb.className='num-cell fin'; eb.textContent=arr[b]; }
+    }
+  }
+  for(let i=0;i<MAX;i++) arr[i]=tmp[i];
+}
+
+/* ── MOSTRAR RESULTADO FINAL ── */
+function mostrarFinal(){
+  const cv=document.getElementById('cv-final');
+  const W=cv.offsetWidth||1000, H=60, dpr=devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr;
+  const ctx=cv.getContext('2d'); ctx.scale(dpr,dpr);
+  const bw=W/MAX;
+  for(let i=0;i<MAX;i++){
+    const h=Math.max(1,((arr[i]+1)/MAX)*(H-1));
+    const t=i/MAX;
+    const r=Math.round(34+(127-34)*t), g=Math.round(184+(119-184)*t), b=Math.round(122+(221-122)*t);
+    ctx.fillStyle=`rgb(${r},${g},${b})`;
+    ctx.fillRect(i*bw, H-h, Math.max(0.5,bw-0.2), h);
+  }
+  const g=document.getElementById('final-nums-grid');
+  let html='';
+  for(let i=0;i<MAX;i++) html+=`<div class="fn-cell">${arr[i]}</div>`;
+  g.innerHTML=html;
+  document.getElementById('final-badge').textContent='✓ 0→999 ordenado';
+  document.getElementById('final-badge').className='final-badge ok';
+  document.getElementById('final-wrap').classList.add('visible');
+}
+
+/* ══════════════════════════════════════════
+   LÓGICA PRINCIPAL — semáforo real:
+   cada hilo toma rangos UNO A LA VEZ,
+   cuando termina busca el SIGUIENTE libre
+   ══════════════════════════════════════════ */
+async function iniciar(){
+  if(corriendo) return;
+  corriendo=true;
+  document.getElementById('btn-run').disabled=true;
+  t0=Date.now();
+  estR=new Array(NR).fill('idle');
+  semR=new Array(NR).fill(false);   /* false = libre, true = tomado */
+  hiloR=[-1,-1,-1,-1]; hiloC=[0,0,0,0]; hiloSwaps=[0,0,0,0];
+  setPill('run');
+  addLog('<span class="tag tsys">inicio</span> m[1000] con valores 0-999 mezclados — lanzando 4 hilos');
+
+  /* Semáforo: toma el primer rango libre (exclusión mutua simple) */
+  function tomarRango(){
+    for(let i=0;i<NR;i++){
+      if(!semR[i]){
+        semR[i]=true;   /* wait() — toma el semáforo */
+        return i;
+      }
+    }
+    return -1; /* no hay rangos libres */
+  }
+
+  /* Trabajo de un hilo:
+     - toma un rango libre
+     - lo ordena completamente
+     - busca el siguiente rango libre
+     - repite hasta que no queden rangos
+  */
+  async function trabajoHilo(id){
+    while(true){
+      const r=tomarRango();
+
+      if(r===-1){
+        /* No hay más rangos libres — este hilo termina */
+        document.getElementById('hc'+id).className='hc done';
+        document.getElementById('hr'+id).textContent='sin rangos — terminado ✓';
+        hiloR[id]=-1;
+        updM();
+        addLog(`<span class="tag th${id}">H${id}</span> no hay rangos libres — <strong>hilo termina</strong>`);
+        break;
+      }
+
+      /* Hilo tomó el rango r */
+      hiloR[id]=r; hiloC[id]++;
+      setSem(r,'tomado',id);
+      setRango(r,'act'+id,id);
+      document.getElementById('hc'+id).className='hc act'+id;
+      document.getElementById('hr'+id).textContent='→ rango '+r+' ('+r*RS+'–'+(r*RS+RS-1)+')';
+      document.getElementById('hcnt'+id).textContent=hiloC[id];
+      addChip(id, r);
+      updM();
+      addLog(`<span class="tag th${id}">H${id}</span> tomó S[${r}] — ordenando ${r*RS}..${r*RS+RS-1}`);
+
+      /* Ordenar el rango con burbuja (animado) */
+      await animarRango(r, id);
+
+      /* Rango terminado */
+      setSem(r,'ord',-1);
+      setRango(r,'listo',-1);
+      hiloR[id]=-1;
+      updM();
+      addLog(`<span class="tag tok">✓ R${r}</span> ordenado por H${id} — <span class="tag tnext">buscando siguiente rango libre...</span>`);
+
+      /* pequeña pausa antes de buscar el siguiente */
+      await delay(80);
+    }
+  }
+
+  /* Lanzar los 4 hilos en paralelo — cada uno corre independientemente */
+  await Promise.all(Array.from({length:NH}, (_,i) => trabajoHilo(i)));
+
+  /* ── BURBUJA FINAL — proceso principal ── */
+  setPill('fin');
+  addLog('<span class="tag tfin">principal</span> todos los rangos ordenados — proceso principal ejecuta burbuja final');
+  estR.fill('finalb');
+  for(let r=0;r<NR;r++){ setSem(r,'fin',-1); setRango(r,'finalb',-1); }
+  await animarFinal();
+
+  /* ── RESULTADO FINAL ── */
+  estR.fill('listo');
+  for(let r=0;r<NR;r++){
+    setRango(r,'listo',-1);
+    for(let k=0;k<RS;k++){
+      const el=document.getElementById(`nc${r}_${k}`);
+      if(el){ el.className='num-cell done'; el.textContent=arr[r*RS+k]; }
+    }
+  }
+  mostrarFinal();
+  const elapsed=Math.round(Date.now()-t0);
+  document.getElementById('m-t').textContent=elapsed;
+  document.getElementById('m-r').textContent='10/10';
+  document.getElementById('m-h').textContent='0';
+  document.getElementById('m-lib').textContent='0';
+  setPill('done');
+  addLog(`<span class="tag tok">completado</span> 1000 elementos ordenados en ${elapsed} ms`);
+  corriendo=false;
+  document.getElementById('btn-run').disabled=false;
+}
+
+/* ── RESET ── */
+function resetear(){
+  if(corriendo) return;
+  arr=llenar();
+  estR=new Array(NR).fill('idle');
+  semR=new Array(NR).fill(false);
+  hiloR=[-1,-1,-1,-1]; hiloC=[0,0,0,0]; hiloSwaps=[0,0,0,0]; t0=0;
+  initUI(); setPill('idle');
+  ['m-r','m-h','m-lib'].forEach(id=>{
+    document.getElementById(id).textContent=id==='m-lib'?'10':id==='m-r'?'0/10':'0';
+  });
+  document.getElementById('m-t').textContent='—';
+  document.getElementById('log').innerHTML='';
+}
+
+/* ARRANQUE */
+arr=llenar();
+estR=new Array(NR).fill('idle');
+initUI();
+window.addEventListener('resize',()=>{ if(document.getElementById('final-wrap').classList.contains('visible')) mostrarFinal(); });
+</script>
+</body>
+</html>
